@@ -25,6 +25,9 @@
 """
 import sys
 import os
+import time
+import subprocess
+import random
 
 with open('/var/log/fran.log', 'a') as the_file:
 	the_file.write("FRAN called! \n  oper={}\n  CONT_ID={}\n  ".format( os.environ['CNI_COMMAND'], os.environ['CNI_CONTAINERID'] ))
@@ -57,16 +60,16 @@ with open('/var/log/fran.log', 'a') as the_file:
 	"""
 	
 	if os.environ['CNI_COMMAND'] == 'ADD':
-		mac = "a2:a6:39:94:24:ef"
 		os.system("mkdir -p /var/run/netns/")
 		
 		
 		ifname = os.environ['CNI_IFNAME']
 		containerid = os.environ['CNI_CONTAINERID']
 		netns = os.environ['CNI_NETNS']
-		host_if_name="veth9009"
-		containerip = "10.244.1.2"
+		host_if_name="veth{}".format(random.randint(100,10000))
+		containerip = "10.244.1.{}".format(random.randint(2,254))
 		gw_ip = "10.244.1.1"
+
 
 		cmd = "ln -sfT %s /var/run/netns/%s"
 		cmd = cmd % (netns, containerid)
@@ -110,10 +113,12 @@ with open('/var/log/fran.log', 'a') as the_file:
 	
 		cmd = "ip netns exec %s ip link show eth0 | awk '/ether/ {print $2}'"
 		cmd = cmd % containerid
-		mi_mac = os.system(cmd)
+		mi_mac = subprocess.check_output(cmd, shell=True).rstrip()
+		the_file.write(" Cmd={} ret={}\n".format(cmd, mi_mac))
 	
-		ret = ret % (mac,netns, containerip)
+		ret = ret % (mi_mac,netns, containerip)
 		the_file.write(" mi_mac={} Out={}".format(mi_mac,ret))
 		print(ret)
+
 sys.exit(0)
 
