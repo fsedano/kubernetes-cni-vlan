@@ -30,21 +30,40 @@ import subprocess
 import random
 from kubernetes import client, config
 
+"""
 
+Tasks for labmon:
+Create namespace
+Create networkattachment req
+
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: qinq-conf
+  namespace: test
+spec:
+  config: '{ "cniVersion": "0.3.1", "name": "mynet", "type": "fran-cni", "network":
+    "9.71.0.0/16", "subnet": "9.71.50.0/24" }'
+
+"""
 def get_vlan_ip(pod_name, pod_namespace, the_file):
 	the_file.write("Compute vlan for name={} ns={}\n".format(pod_name, pod_namespace))
 	config.load_kube_config()
 	v1=client.CoreV1Api()
 	req_ip = ""
 	vlan_id = 0
+	the_file.write("Start 1\n")
 	try:
 		data = v1.read_namespaced_pod(pod_name, pod_namespace)
 		vlan_id = int(data.metadata.annotations['cisco.epfl/vlan_id'])
 	except:
+		the_file.write("Got exception!\n")
 		pass
 	try:
+		the_file.write("Req IP!\n")
 		req_ip = data.metadata.annotations['cisco.epfl/ip_address']
 	except:
+		the_file.write("Got exception!\n")
 		pass
 	the_file.write("Requested ip={}".format(req_ip))
 	return vlan_id, req_ip
@@ -139,10 +158,11 @@ with open('/var/log/fran.log', 'a') as the_file:
 			r = os.system(cmd)
 			the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
-			cmd = "ip link set %s master phy_638"
-			cmd = cmd % host_if_name
-			r = os.system(cmd)
-			the_file.write(" Cmd={} ret={}\n".format(cmd, r))
+            cmd = "ip link set %s master %s"
+            phy_name = "phy_{}".format(vlan)
+            cmd = cmd % (host_if_name, phy_name)
+            r = os.system(cmd)
+            the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
 			cmd = "ip link set %s netns %s"
 			cmd = cmd % (ifname, containerid)
@@ -160,13 +180,13 @@ with open('/var/log/fran.log', 'a') as the_file:
 			the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
 			# Send GARP
-			cmd = "nohup echo 'sleep 5; ip netns exec %s /usr/sbin/arping -U -c 1 %s' | at now" 
-			cmd = cmd % (containerid, containerip)
-			try:
-				out = subprocess.check_output(cmd, shell=True)
-				the_file.write(" Cmd={} ret={}\n".format(cmd, out))
-			except subprocess.CalledProcessError as e:
-				the_file.write("Except on cmd={}. E={}\n".format(cmd, e))
+			#cmd = "nohup echo 'sleep 5; ip netns exec %s /usr/sbin/arping -U -c 1 %s' | at now" 
+			#cmd = cmd % (containerid, containerip)
+			#try:
+			#	out = subprocess.check_output(cmd, shell=True)
+			#	the_file.write(" Cmd={} ret={}\n".format(cmd, out))
+			#except subprocess.CalledProcessError as e:
+			#	the_file.write("Except on cmd={}. E={}\n".format(cmd, e))
 				
 			
 
