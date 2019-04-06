@@ -1,0 +1,73 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fran-cni-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: fran-cni
+data:
+  fran-cni-conf.json: |
+    {
+      "fran":"Bueno"
+    }
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: fran-ds-amd64
+  namespace: kube-system
+  labels:
+    tier: node
+    app: fran-cni
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: fran-cni
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: multus
+      containers:
+      - name: fran-cni
+        image: fsedano/alp1
+        command: ["sh", "-c", "ping 127.0.0.1"]
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: fran-cni
+          mountPath: /host/etc/cni/net.d
+        - name: fran-cnibin
+          mountPath: /host/opt/cni/bin
+        - name: fran-multus-cfg
+          mountPath: /tmp/fran-multus-conf
+      volumes:
+        - name: fran-cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: fran-cnibin
+          hostPath:
+            path: /opt/cni/bin
+        - name: fran-multus-cfg
+          configMap:
+            name: fran-cni-config
+            items:
+            - key: fran-cni-conf.json
+              path: 80-multus.conf1
+
+## /tmp/fran-multus-conf # cp * /host/etc/cni/net.d/

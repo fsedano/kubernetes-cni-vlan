@@ -7,3 +7,7 @@
         "network": "10.244.0.0/16",
         "subnet": "10.244.1.0/24"
 }
+
+
+-- Inside container:
+/tmp/fran-multus-conf # cp * /host/etc/cni/net.d/
