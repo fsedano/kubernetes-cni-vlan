@@ -1,25 +1,12 @@
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: fran-cni-config
-  namespace: kube-system
-  labels:
-    tier: node
-    app: fran-cni
-data:
-  fran-cni-conf.json: |
-    {
-      "fran":"Bueno"
-    }
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fran-ds-amd64
+  name: labmon-ds-amd64
   namespace: kube-system
   labels:
     tier: node
-    app: fran-cni
+    app: labmon-cni
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -27,7 +14,7 @@ spec:
     metadata:
       labels:
         tier: node
-        app: fran-cni
+        app: labmon-cni
     spec:
       hostNetwork: true
       nodeSelector:
@@ -37,9 +24,8 @@ spec:
         effect: NoSchedule
       serviceAccountName: multus
       containers:
-      - name: fran-cni
-        image: fsedano/alp1
-        command: ["sh", "-c", "ping 127.0.0.1"]
+      - name: labmon-cni
+        image: fsedano/labmon-cni:latest
         resources:
           requests:
             cpu: "100m"
@@ -50,24 +36,19 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - name: fran-cni
-          mountPath: /host/etc/cni/net.d
-        - name: fran-cnibin
+        - name: labmon-cnibin
           mountPath: /host/opt/cni/bin
-        - name: fran-multus-cfg
-          mountPath: /tmp/fran-multus-conf
       volumes:
-        - name: fran-cni
-          hostPath:
-            path: /etc/cni/net.d
-        - name: fran-cnibin
+        - name: labmon-cnibin
           hostPath:
             path: /opt/cni/bin
-        - name: fran-multus-cfg
-          configMap:
-            name: fran-cni-config
-            items:
-            - key: fran-cni-conf.json
-              path: 80-multus.conf1
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: qinq-conf
+spec:
+  config: '{ "cniVersion": "0.3.1", "name": "labmon-net", "type": "labmon.py" }'
 
+## type=exe name
 ## /tmp/fran-multus-conf # cp * /host/etc/cni/net.d/

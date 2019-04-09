@@ -11,3 +11,32 @@
 
 -- Inside container:
 /tmp/fran-multus-conf # cp * /host/etc/cni/net.d/
+
+## create token
+
+
+"""
+
+-- save as /opt/cni/bin/fran-cni
+
+{
+  "cniVersion": "0.3.1",
+  "interfaces": [
+      {
+          "name": "eth0",
+          "mac": "a2:a6:39:94:24:ef",
+          "sandbox": "/proc/4941/ns/net"
+      }
+  ],
+  "ips": [
+      {
+          "version": "4",
+          "address": "10.244.1.2/24",
+          "gateway": "10.244.1.1",
+          "interface": 0
+      }
+  ]
+}
+"""
+
+
