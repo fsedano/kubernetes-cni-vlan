@@ -1,0 +1,6 @@
+export CNI_COMMAND="ADD"
+export CNI_CONTAINERID="sdfsjdfk"
+export CNI_NETNS="333"
+export CNI_IFNAME="net1"
+export CNI_ARGS="IgnoreUnknown=1;K8S_POD_NAMESPACE=ns-gtopo-1-topo-58;K8S_POD_NAME=28e8440f-d9c648c5b-4d94b;K8S_POD_INFRA_CONTAINER_ID=06bce7a5e659a30f302400bae76a15c2317f10588740e12d27f8fd47bb78be1a"
+export CNI_PATH="/opt/cni/bin"
