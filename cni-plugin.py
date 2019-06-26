@@ -146,8 +146,6 @@ with open('/var/log/fran.log', 'a') as the_file:
 
         host_if_name="veth{}".format(random.randint(100,10000))
         mi_mac = "aa:bb:cc:dd:ee:ff"
-        #if containerip == "":
-    #		containerip = "9.9.71.{}".format(random.randint(2,254))
 
         if vlan > 0:
             common_setup(vlan, the_file)
