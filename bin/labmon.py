@@ -78,7 +78,7 @@ def get_vlan_ip(pod_name, pod_namespace, the_file):
 
 def try_cmd(cmd, the_file):
     try:
-        rc = subprocess.check_output(cmd, shell=True)
+        rc = subprocess.check_output(cmd, shell=True).decode()
         the_file.write("CMD={} Out={}\n".format(cmd, rc))
     except:
         the_file.write("EXCEPT cmd={}\n".format(cmd))
@@ -136,7 +136,8 @@ with open('/var/log/labmon-cni.log', 'a') as the_file:
         """
     if os.environ['CNI_COMMAND'] == 'ADD':
         the_file.write("1\n")
-        os.system("mkdir -p /var/run/netns/")
+        cmd = "mkdir -p /var/run/netns/"
+        r = subprocess.check_output(cmd, shell=True).decode()
 
         ifname = os.environ['CNI_IFNAME']
         containerid = os.environ['CNI_CONTAINERID']
@@ -152,39 +153,39 @@ with open('/var/log/labmon-cni.log', 'a') as the_file:
 
             cmd = "ln -sfT %s /var/run/netns/%s"
             cmd = cmd % (netns, containerid)
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             cmd = "ip link add %s type veth peer name %s"
             cmd = cmd % (ifname, host_if_name)
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             cmd = "ip link set %s up"
             cmd = cmd % host_if_name
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             cmd = "ip link set %s master %s"
             phy_name = "phy_{}".format(vlan)
             cmd = cmd % (host_if_name, phy_name)
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             cmd = "ip link set %s netns %s"
             cmd = cmd % (ifname, containerid)
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             cmd = "ip netns exec %s ip link set %s up"
             cmd = cmd % (containerid, ifname)
-            r = os.system(cmd)
+            r = subprocess.check_output(cmd, shell=True).decode()
             the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             if containerip != "":
                 cmd = "ip netns exec %s ip addr add %s/%s dev %s"
                 cmd = cmd % (containerid, containerip, containerpfxlen, ifname)
-                r = os.system(cmd)
+                r = subprocess.check_output(cmd, shell=True).decode()
                 the_file.write(" Cmd={} ret={}\n".format(cmd, r))
 
             # Send GARP
@@ -196,16 +197,9 @@ with open('/var/log/labmon-cni.log', 'a') as the_file:
             #except subprocess.CalledProcessError as e:
             #	the_file.write("Except on cmd={}. E={}\n".format(cmd, e))
 
-
-
-            #cmd = "ip netns exec %s ip route add default via %s dev %s"
-            #cmd = cmd % (containerid, gw_ip, ifname)
-            #r = os.system(cmd)
-            #the_file.write(" Cmd={} ret={}\n".format(cmd, r))
-
             cmd = "ip netns exec %s ip link show %s | awk '/ether/ {print $2}'"
             cmd = cmd % (containerid, ifname)
-            mi_mac = subprocess.check_output(cmd, shell=True).rstrip()
+            mi_mac = subprocess.check_output(cmd, shell=True).decode().rstrip()
             the_file.write(" Cmd={} ret={}\n".format(cmd, mi_mac))
 
 
