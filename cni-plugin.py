@@ -100,8 +100,8 @@ def common_setup(vlan_id, the_file):
     try_cmd("iptables -A FORWARD -i {}  -j ACCEPT".format(br_name), the_file)
 
 
-with open('/var/log/fran.log', 'a') as the_file:
-    the_file.write("FRAN called! \n  oper={}\n  CONT_ID={}\n  ".format( os.environ['CNI_COMMAND'], os.environ['CNI_CONTAINERID'] ))
+with open('/var/log/labmon-cni.log', 'a') as the_file:
+    the_file.write("LABMON CNI called! \n  oper={}\n  CONT_ID={}\n  ".format( os.environ['CNI_COMMAND'], os.environ['CNI_CONTAINERID'] ))
     the_file.write("Netns={}\n  Ifname={}\n  Args={}\n  Path={} \n".format( os.environ['CNI_NETNS'], os.environ['CNI_IFNAME'], os.environ['CNI_ARGS'], os.environ['CNI_PATH']))
 
     cni_args = os.environ['CNI_ARGS']

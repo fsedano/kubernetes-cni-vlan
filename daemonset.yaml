@@ -48,7 +48,5 @@ kind: NetworkAttachmentDefinition
 metadata:
   name: qinq-conf
 spec:
-  config: '{ "cniVersion": "0.3.1", "name": "labmon-net", "type": "labmon.py" }'
+  config: '{ "cniVersion": "0.3.1", "name": "labmon-net", "type": "labmon" }'
 
-## type=exe name
-## /tmp/fran-multus-conf # cp * /host/etc/cni/net.d/
