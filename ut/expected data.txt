@@ -1,0 +1,36 @@
+Stdin:
+
+{ "cniVersion": "0.3.1", "name": "labmon-net", "type": "labmon" }
+
+Env:
+{'CNI_COMMAND': 'ADD', 'CNI_CONTAINERID': 'e88b70e98485a82e6f855054c78092060d3ac9fdc3895e211337bf836f13f4d8', 'CNI_NETNS': '/proc/1595/ns/net', 'CNI_ARGS': 'IgnoreUnknown=1;K8S_POD_NAMESPACE=ns-gtopo-51-topo-313;K8S_POD_NAME
+=03089d4d-65496c5b66-bq5c8;K8S_POD_INFRA_CONTAINER_ID=e88b70e98485a82e6f855054c78092060d3ac9fdc3895e211337bf836f13f4d8', 'CNI_IFNAME': 'net1', 'CNI_PATH': '/opt/cni/bin', 'LANG': 'en_US.UTF-8', 'PATH': '/usr/local/sbin:/usr/local/bin:/u
+sr/sbin:/usr/bin:/sbin:/bin', 'INVOCATION_ID': 'c3be0b0e93b142698f5b177b8ef587c4', 'JOURNAL_STREAM': '9:40292', 'KUBELET_KUBECONFIG_ARGS': '--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubel
+et.conf', 'KUBELET_CONFIG_ARGS': '--config=/var/lib/kubelet/config.yaml', 'KUBELET_KUBEADM_ARGS': '--cgroup-driver=cgroupfs --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --resolv-conf=/run/systemd/resolve/resolv.
+conf'}
+
+
+Annotations:
+return {'cisco.epfl/interface_maps': '[{"interface":"net1","vlan":519,"ip":"1.1.1.1","netmask":""},{"interface":"net2","vlan":520,"ip":"2.2.2.2","netmask":""}]', 'k8s.v1.cni.cncf.io/networks': 'qinq-conf'}
+
+
+Output:
+
+{
+  "cniVersion": "0.3.1",
+  "interfaces": [
+      {
+          "name": "veth5420",
+          "mac": "b'5a:ce:2d:55:04:5d'",
+          "sandbox": "/proc/29279/ns/net"
+      }
+  ],
+  "ips": [
+      {
+          "version": "4",
+          "address": "10.0.0.2/24",
+          "gateway": "9.9.71.1",
+          "interface": 0
+      }
+  ]
+}

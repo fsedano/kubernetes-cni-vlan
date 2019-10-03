@@ -1,0 +1,12 @@
+# docker compose for development
+version: '3'
+services:
+  cni:
+    volumes:
+      - ./:/app2:delegated
+    build: .
+    entrypoint:
+      - /bin/sh
+      - -c
+      - /app/ut.sh
+      
