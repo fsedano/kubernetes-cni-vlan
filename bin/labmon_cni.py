@@ -7,17 +7,18 @@ import random
 from kubernetes import client, config
 import json
 import ipaddress
+import logging
 
 MASTER_INTERFACE_NAME = "ens192"
 class K8s_Params:
     def __init__(self):
         self.k8s_data = self.get_k8s_params()
         self.pod_data = self.get_pod_data()
+        self.interface_maps = self.get_interface_maps(self.pod_name(),self.netns())
 
 
     def get_pod_data(self):
         input_data = dict(s.split('=') for s in self.k8s_data['CNI_ARGS'].split(';'))
-        print(f"Input data is {input_data}\n")
         data = {}
         data['K8S_POD_NAME'] = input_data['K8S_POD_NAME']
         data['K8S_POD_NAMESPACE'] = input_data['K8S_POD_NAMESPACE']
@@ -32,6 +33,14 @@ class K8s_Params:
         k8s_data['CNI_ARGS'] = os.environ['CNI_ARGS']
         k8s_data['CNI_PATH'] = os.environ['CNI_PATH']
         return k8s_data
+
+    def get_interface_maps(self, pod_name, netns):
+        logging.info(f"Getting interface maps for pod_name {pod_name} ns {netns}")
+        config.load_kube_config()
+        v1=client.CoreV1Api()
+        data = v1.read_namespaced_pod(pod_name, netns)
+        interface_data = data.metadata.annotations['cisco.epfl/interface_maps']
+        return interface_data
 
     #fixme getters
     def command(self):
@@ -51,34 +60,67 @@ class K8s_Params:
 
     def pod_name(self):
         return self.pod_data['K8S_POD_NAME']
-    
-    def get_interface_maps(self, pod_name, netns):
-        return {}
+
+    def sanitize_interface_data(self):
+        for map in self.interface_maps:
+            if map['netmask'] == "":
+                map['netmask'] = "255.255.255.0"
+
 
 class OSexec:
     @classmethod
     def exec(self, cmd):
-        print(f"EXEC: CALLING {cmd}\n")
+        subprocess.check_output(cmd, shell=True).decode()
+    @classmethod
+    def exec_get_output(self, cmd):
         rc = subprocess.check_output(cmd, shell=True).decode()
         return rc
 
 class CNIInterface:
-    def __init__(self, interface_data):
+    def __init__(self, interface_data, k8s_params, index):
         self.interface_data = interface_data
+        self.k8s_data = k8s_params
+        self.output_interface_data = {}
+        self.output_ip_data = {}
+        self.index = index
 
     def bringup(self):
-        print(f"Interface data is {self.interface_data}\n")
+        logging.info("On interface bringup")
         vlan = self.interface_data['vlan']
-        br_name = f"phy_{vlan}"
+        phy_name = f"phy_{vlan}"
+        netns = self.k8s_data.netns()
+        containerid = self.k8s_data.container_id()
+        ifname = self.interface_data['interface']
+        host_if_index = random.randint(100,10000)
+        host_if_name = f"veth{host_if_index}"
 
         OSexec.exec(f"modprobe --first-time 8021q")
         OSexec.exec(f"ip link set {MASTER_INTERFACE_NAME} up")
         OSexec.exec(f"ip link add link {MASTER_INTERFACE_NAME} name {MASTER_INTERFACE_NAME}.{vlan} type vlan id {vlan}")
         OSexec.exec(f"ip link set {MASTER_INTERFACE_NAME}.{vlan} up")
-        OSexec.exec(f"brctl addbr {br_name}")
-        OSexec.exec(f"brctl addif {br_name} {MASTER_INTERFACE_NAME}.{vlan}")
-        OSexec.exec(f"ip link set {br_name} up")
-        OSexec.exec(f"iptables -A FORWARD -i {br_name}  -j ACCEPT")
+        OSexec.exec(f"brctl addbr {phy_name}")
+        OSexec.exec(f"brctl addif {phy_name} {MASTER_INTERFACE_NAME}.{vlan}")
+        OSexec.exec(f"ip link set {phy_name} up")
+        OSexec.exec(f"iptables -A FORWARD -i {phy_name}  -j ACCEPT")
+        OSexec.exec(f"ln -sfT {netns} /var/run/netns/{containerid}")
+        OSexec.exec(f"ip link add {ifname} type veth peer name {host_if_name}")
+        OSexec.exec(f"ip link set {host_if_name} up")
+        OSexec.exec(f"ip link set {host_if_name} master {phy_name}")
+        OSexec.exec(f"ip link set {ifname} netns {containerid}")
+        OSexec.exec(f"ip netns exec {containerid} ip link set {ifname} up")
+        if self.interface_data['ip'] != "":
+            IP = ipaddress.ip_interface(f"{self.interface_data['ip']}/{self.interface_data['netmask']}")
+            OSexec.exec(f"ip netns exec {containerid} ip addr add {IP.with_prefixlen} dev {ifname}")
+        cmd = "ip netns exec %s ip link show %s | awk '/ether/ {print $2}'"
+        cmd = cmd % (containerid, ifname)
+        if_mac = OSexec.exec_get_output(cmd)
+        self.output_interface_data['mac'] = if_mac
+        self.output_interface_data['name'] = ifname
+        self.output_interface_data['sandbox'] = netns
+
+        self.output_ip_data['version'] = 4
+        self.output_ip_data['address'] = IP.with_prefixlen
+        self.output_ip_data['interface'] = self.index
 
 
 
@@ -88,23 +130,43 @@ class K8s_CNI:
         self.OS = OSexec()
 
     def oper_add(self):
-        print("In oper add!")
-        #rc = self.OS.exec("ls")
-        #print(f"RC is {rc}")
+        logging.info("In oper add")
         k = self.k
-        #container_id = k.container_id()
-        interface_data = k.get_interface_maps(k.pod_name(), k.netns())
+        interfaces_data = k.get_interface_maps(k.pod_name(), k.netns())
+        k.sanitize_interface_data()
 
         # Loop thru the interfaces
-        for interface_data in k.get_interface_maps(k.pod_name(), k.netns()):
-            print(f"Interface is {interface_data}")
-            CNIInterface(interface_data).bringup()
+        index = 0
+        cni_result = {'cniVersion' : '0.3.1'}
+        cni_interfaces = []
+        cni_ips = []
+        logging.info(f"Interface data: {interfaces_data}")
+        for interface_data in interfaces_data:
+            Interface = CNIInterface(interface_data, self.k, index)
+            Interface.bringup()
+            cni_interfaces.append(Interface.output_interface_data)
+            cni_ips.append(Interface.output_ip_data)
+            index = index + 1
 
+        cni_result['interfaces'] = cni_interfaces
+        cni_result['ips'] = cni_ips
+        print(json.dumps(cni_result, sort_keys=True, indent=4))
     def oper_del(self):
-        print("In oper DEL!")
+        pass
 
     def entrypoint(self):
         if self.k.is_command_add():
             self.oper_add()
         if self.k.is_command_del():
             self.oper_del()
+
+### Entrypoint ###
+if __name__ == "__main__":
+    logging.basicConfig(filename='/tmp/app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+    logging.info("Called from MAIN")
+    try:
+        K8s_CNI().entrypoint()
+    except Exception as e:
+        logging.exception(f"Exception on main")
+
+    sys.exit(0)

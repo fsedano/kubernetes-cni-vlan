@@ -3,10 +3,11 @@
 import unittest
 from unittest import mock
 import labmon_cni
+import logging
 
 MOCKED_K8S_PARAMS = {
     'CNI_COMMAND' : 'ADD',
-    'CNI_CONTAINERID' : "xxxx",
+    'CNI_CONTAINERID' : "1234cntid4321",
     'CNI_NETNS' : "33efdij",
     'CNI_IFNAME' : 'net1',
     'CNI_ARGS' : 'K8S_POD_NAMESPACE=123455;K8S_POD_NAME=MY_POD_NAME',
@@ -19,12 +20,17 @@ MOCKED_INTERFACE_MAPS = [
 ]
 
 def log_exec(arg):
-    print(f"-> {arg} <-\n")
+    logging.info(f"-> {arg} <-\n")
+
+def log_exec_with_rc(arg):
+    logging.info(f"-> {arg} <-\n")
+    return "de:ad:be:ee:ef"
 
 class lmUnitTest(unittest.TestCase):        
     @mock.patch('labmon_cni.K8s_Params.get_k8s_params')
     @mock.patch('labmon_cni.K8s_Params.get_interface_maps')
     @mock.patch('labmon_cni.OSexec.exec', log_exec)
+    @mock.patch('labmon_cni.OSexec.exec_get_output', log_exec_with_rc)
     def test_one(self,
         labmon_cni_K8s_Params_get_interface_maps,
         labmon_cni_K8s_Params_get_k8s_params):
@@ -34,4 +40,5 @@ class lmUnitTest(unittest.TestCase):
         K8.entrypoint()
         
 
+logging.basicConfig(filename='/tmp/app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 unittest.main()
