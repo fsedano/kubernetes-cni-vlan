@@ -14,7 +14,7 @@ class K8s_Params:
     def __init__(self):
         self.k8s_data = self.get_k8s_params()
         self.pod_data = self.get_pod_data()
-        self.interface_maps = self.get_interface_maps(self.pod_name(),self.netns())
+        self.interface_maps = self.get_interface_maps(self.pod_name(),self.pod_namespace())
 
 
     def get_pod_data(self):
@@ -32,15 +32,17 @@ class K8s_Params:
         k8s_data['CNI_IFNAME'] = os.environ['CNI_IFNAME']
         k8s_data['CNI_ARGS'] = os.environ['CNI_ARGS']
         k8s_data['CNI_PATH'] = os.environ['CNI_PATH']
+        logging.info(f"Retrieved k8s params: {k8s_data}")
         return k8s_data
 
-    def get_interface_maps(self, pod_name, netns):
-        logging.info(f"Getting interface maps for pod_name {pod_name} ns {netns}")
+    def get_interface_maps(self, pod_name, pod_namespace):
+        logging.info(f"Getting interface maps for pod_name {pod_name} ns {pod_namespace}")
         config.load_kube_config()
         v1=client.CoreV1Api()
-        data = v1.read_namespaced_pod(pod_name, netns)
+        data = v1.read_namespaced_pod(pod_name, pod_namespace)
         interface_data = data.metadata.annotations['cisco.epfl/interface_maps']
-        return interface_data
+        logging.info(f"Interfade data is {interface_data}")
+        return json.loads(interface_data)
 
     #fixme getters
     def command(self):
@@ -61,8 +63,12 @@ class K8s_Params:
     def pod_name(self):
         return self.pod_data['K8S_POD_NAME']
 
+    def pod_namespace(self):
+        return self.pod_data['K8S_POD_NAMESPACE']
+
     def sanitize_interface_data(self):
         for map in self.interface_maps:
+            logging.info(f"Processing IF_MAP to sanizite={map}")
             if map['netmask'] == "":
                 map['netmask'] = "255.255.255.0"
 
@@ -70,11 +76,22 @@ class K8s_Params:
 class OSexec:
     @classmethod
     def exec(self, cmd):
-        subprocess.check_output(cmd, shell=True).decode()
+        try:
+            subprocess.check_output(cmd, shell=True).decode()
+            logging.info(f" SUCCESS -> {cmd}")
+        except:
+            logging.info(f" FAILURE -> {cmd}")
+            pass
     @classmethod
     def exec_get_output(self, cmd):
-        rc = subprocess.check_output(cmd, shell=True).decode()
-        return rc
+        rc = ""
+        try:
+            rc = subprocess.check_output(cmd, shell=True).decode()
+            logging.info(f" SUCCESS -> {cmd}")
+        except:
+            logging.info(f" FAILURE -> {cmd}")
+            pass
+        return rc.rstrip()
 
 class CNIInterface:
     def __init__(self, interface_data, k8s_params, index):
@@ -118,7 +135,7 @@ class CNIInterface:
         self.output_interface_data['name'] = ifname
         self.output_interface_data['sandbox'] = netns
 
-        self.output_ip_data['version'] = 4
+        self.output_ip_data['version'] = "4"
         self.output_ip_data['address'] = IP.with_prefixlen
         self.output_ip_data['interface'] = self.index
 
@@ -132,7 +149,8 @@ class K8s_CNI:
     def oper_add(self):
         logging.info("In oper add")
         k = self.k
-        interfaces_data = k.get_interface_maps(k.pod_name(), k.netns())
+        interfaces_data = k.interface_maps
+        logging.info(f"INTERFACES DATA={interfaces_data}")
         k.sanitize_interface_data()
 
         # Loop thru the interfaces
@@ -150,7 +168,9 @@ class K8s_CNI:
 
         cni_result['interfaces'] = cni_interfaces
         cni_result['ips'] = cni_ips
-        print(json.dumps(cni_result, sort_keys=True, indent=4))
+        rc = json.dumps(cni_result, sort_keys=True, indent=4)
+        logging.info(f"Processing done, retunring={rc}")
+        print(rc)
     def oper_del(self):
         pass
 
