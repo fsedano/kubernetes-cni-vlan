@@ -108,8 +108,7 @@ class CNIInterface:
         netns = self.k8s_data.netns()
         containerid = self.k8s_data.container_id()
         ifname = self.interface_data['interface']
-        host_if_index = random.randint(100,10000)
-        host_if_name = f"veth{host_if_index}"
+        host_if_name = f"veth{vlan}"
 
         OSexec.exec(f"modprobe --first-time 8021q")
         OSexec.exec(f"ip link set {MASTER_INTERFACE_NAME} up")
@@ -132,6 +131,27 @@ class CNIInterface:
         cmd = cmd % (containerid, ifname)
         if_mac = OSexec.exec_get_output(cmd)
         self.output_interface_data['mac'] = if_mac
+        self.output_interface_data['name'] = ifname
+        self.output_interface_data['sandbox'] = netns
+
+        self.output_ip_data['version'] = "4"
+        self.output_ip_data['address'] = IP.with_prefixlen
+        self.output_ip_data['interface'] = self.index
+
+    def teardown(self):
+        logging.info("On interface teardown")
+        vlan = self.interface_data['vlan']
+        phy_name = f"phy_{vlan}"
+        netns = self.k8s_data.netns()
+        ifname = self.interface_data['interface']
+        host_if_name = f"veth{vlan}"
+        if self.interface_data['ip'] != "":
+            IP = ipaddress.ip_interface(f"{self.interface_data['ip']}/{self.interface_data['netmask']}")
+
+        OSexec.exec(f"ip link delete {MASTER_INTERFACE_NAME}.{vlan}")
+        OSexec.exec(f"ip link delete {phy_name}")
+        OSexec.exec(f"ip link delete {host_if_name}")
+        OSexec.exec(f"iptables -D FORWARD -i {phy_name}  -j ACCEPT")
         self.output_interface_data['name'] = ifname
         self.output_interface_data['sandbox'] = netns
 
@@ -172,7 +192,31 @@ class K8s_CNI:
         logging.info(f"Processing done, retunring={rc}")
         print(rc)
     def oper_del(self):
-        pass
+        logging.info("In oper DEL")
+        k = self.k
+        interfaces_data = k.interface_maps
+        logging.info(f"INTERFACES DATA={interfaces_data}")
+        k.sanitize_interface_data()
+
+        # Loop thru the interfaces
+        index = 0
+        cni_result = {'cniVersion' : '0.3.1'}
+        cni_interfaces = []
+        cni_ips = []
+        logging.info(f"Interface data: {interfaces_data}")
+        for interface_data in interfaces_data:
+            Interface = CNIInterface(interface_data, self.k, index)
+            Interface.teardown()
+            cni_interfaces.append(Interface.output_interface_data)
+            cni_ips.append(Interface.output_ip_data)
+            index = index + 1
+
+        cni_result['interfaces'] = cni_interfaces
+        cni_result['ips'] = cni_ips
+        rc = json.dumps(cni_result, sort_keys=True, indent=4)
+        logging.info(f"Processing done, retunring={rc}")
+        print(rc)
+
 
     def entrypoint(self):
         if self.k.is_command_add():
