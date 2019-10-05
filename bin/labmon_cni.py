@@ -14,7 +14,7 @@ class K8s_Params:
     def __init__(self):
         self.k8s_data = self.get_k8s_params()
         self.pod_data = self.get_pod_data()
-        self.interface_maps = self.get_interface_maps(self.pod_name(),self.pod_namespace())
+        self.k8s_annotations = self.get_annotations(self.pod_name(),self.pod_namespace())
 
 
     def get_pod_data(self):
@@ -26,6 +26,7 @@ class K8s_Params:
 
     def get_k8s_params(self):
         k8s_data =  {}
+        logging.info(f"Reading CNI info from environment {os.environ}")
         k8s_data['CNI_COMMAND'] = os.environ['CNI_COMMAND']
         k8s_data['CNI_CONTAINERID'] = os.environ['CNI_CONTAINERID']
         k8s_data['CNI_NETNS'] = os.environ['CNI_NETNS']
@@ -35,15 +36,45 @@ class K8s_Params:
         logging.info(f"Retrieved k8s params: {k8s_data}")
         return k8s_data
 
-    def get_interface_maps(self, pod_name, pod_namespace):
-        logging.info(f"Getting interface maps for pod_name {pod_name} ns {pod_namespace}")
+    def get_annotations(self, pod_name, pod_namespace):
+        logging.info(f"Getting annotations for pod_name {pod_name} ns {pod_namespace}")
         config.load_kube_config()
         v1=client.CoreV1Api()
-        data = v1.read_namespaced_pod(pod_name, pod_namespace)
-        interface_data = data.metadata.annotations['cisco.epfl/interface_maps']
-        logging.info(f"Interfade data is {interface_data}")
-        return json.loads(interface_data)
+        annotations = {}
+        try:
+            data = v1.read_namespaced_pod(pod_name, pod_namespace)
+            annotations = data.metadata.annotations
+            logging.info(f"Annotations is {annotations}")
+        except:
+            logging.info("No interface data found")
 
+        return annotations
+
+    def get_interface_maps(self, annotations):
+        try:
+            return json.loads(annotations['cisco.epfl/interface_maps'])
+        except:
+            return []
+
+    def add_old_style_interface_maps(self, interface_maps, annotations):
+        logging.info(f"Adding old style annotations={annotations}")
+        try:
+            ip_address = annotations['cisco.epfl/ip_address']
+            prefix_length = annotations['cisco.epfl/ip_prefix_length']
+            vlan = annotations['cisco.epfl/vlan_id']
+            IP = ipaddress.ip_interface(f"{ip_address}/{prefix_length}")
+
+            map = {
+                "interface" : "net1",
+                "vlan" : vlan,
+                "netmask" : str(IP.netmask),
+                "ip" : ip_address
+            }
+            interface_maps.append(map)
+        except:
+            logging.exception("Data not found")
+            pass
+        return interface_maps
     #fixme getters
     def command(self):
         return self.k8s_data['CNI_COMMAND']
@@ -66,12 +97,13 @@ class K8s_Params:
     def pod_namespace(self):
         return self.pod_data['K8S_POD_NAMESPACE']
 
-    def sanitize_interface_data(self):
-        for map in self.interface_maps:
+    def sanitize_interface_data(self,interface_maps):
+        logging.info(f"List of interface maps to sanitize={interface_maps}")
+        for map in interface_maps:
             logging.info(f"Processing IF_MAP to sanizite={map}")
             if map['netmask'] == "":
                 map['netmask'] = "255.255.255.0"
-
+        return interface_maps
 
 class OSexec:
     @classmethod
@@ -168,18 +200,13 @@ class K8s_CNI:
 
     def oper_add(self):
         logging.info("In oper add")
-        k = self.k
-        interfaces_data = k.interface_maps
-        logging.info(f"INTERFACES DATA={interfaces_data}")
-        k.sanitize_interface_data()
-
+        interface_maps = self.prepare_interface_maps()
         # Loop thru the interfaces
         index = 0
         cni_result = {'cniVersion' : '0.3.1'}
         cni_interfaces = []
         cni_ips = []
-        logging.info(f"Interface data: {interfaces_data}")
-        for interface_data in interfaces_data:
+        for interface_data in interface_maps:
             Interface = CNIInterface(interface_data, self.k, index)
             Interface.bringup()
             cni_interfaces.append(Interface.output_interface_data)
@@ -191,20 +218,31 @@ class K8s_CNI:
         rc = json.dumps(cni_result, sort_keys=True, indent=4)
         logging.info(f"Processing done, retunring={rc}")
         print(rc)
+
+    def prepare_interface_maps(self):
+        k = self.k
+        interface_maps = k.get_interface_maps(k.k8s_annotations)
+        logging.info(f"STEP1: interface_maps is {interface_maps}")
+        # Add old-style interface maps
+        interface_maps = k.add_old_style_interface_maps(interface_maps, k.k8s_annotations)
+        logging.info(f"STEP2: interface_maps is {interface_maps}")
+        interface_maps = k.sanitize_interface_data(interface_maps)
+        logging.info(f"STEP3: interface_maps is {interface_maps}")
+        logging.info(f"INTERFACES DATA={interface_maps}")
+        return interface_maps
+
     def oper_del(self):
         logging.info("In oper DEL")
-        k = self.k
-        interfaces_data = k.interface_maps
-        logging.info(f"INTERFACES DATA={interfaces_data}")
-        k.sanitize_interface_data()
+        interface_maps = self.prepare_interface_maps()
+
 
         # Loop thru the interfaces
         index = 0
         cni_result = {'cniVersion' : '0.3.1'}
         cni_interfaces = []
         cni_ips = []
-        logging.info(f"Interface data: {interfaces_data}")
-        for interface_data in interfaces_data:
+        logging.info(f"Interface data: {interface_maps}")
+        for interface_data in interface_maps:
             Interface = CNIInterface(interface_data, self.k, index)
             Interface.teardown()
             cni_interfaces.append(Interface.output_interface_data)
@@ -226,8 +264,7 @@ class K8s_CNI:
 
 ### Entrypoint ###
 if __name__ == "__main__":
-    logging.basicConfig(filename='/tmp/app.log', filemode='a', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-    logging.info("Called from MAIN")
+    logging.basicConfig(filename='/tmp/app.log', filemode='a', format='%(asctime)s [%(process)d] - %(levelname)s - %(message)s', level=logging.DEBUG)
     try:
         K8s_CNI().entrypoint()
     except Exception as e:
