@@ -28,21 +28,21 @@ HTTPS_PROXY="http://proxy.esl.cisco.com:80/"
 NO_PROXY=".cisco.com,127.0.0.1,localhost,10.0.0.0/8"
 
 
-•	Install packages
+Install packages
 
-sudo apt-get update && sudo apt-get -y upgrade
-sudo apt install docker.io apt-transport-https curl python3 python3-pip -y
-sudo systemctl start docker
-sudo systemctl enable docker
-curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
-sudo apt-get install kubeadm -y
-pip3 install kubernetes
+* sudo apt-get update && sudo apt-get -y upgrade
+* sudo apt install docker.io apt-transport-https curl python3 python3-pip -y
+* sudo systemctl start docker
+* sudo systemctl enable docker
+* curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+* sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+* sudo apt-get install kubeadm -y
+* pip3 install kubernetes
 
 
-•	Edit /etc/fstab to remove any swap entry
-•	reboot
-•	Enable proxy for docker
+* Edit /etc/fstab to remove any swap entry
+* reboot
+* Enable proxy for docker
 
 
 sudo mkdir /etc/systemd/system/docker.service.d
@@ -65,26 +65,27 @@ At this point, you can clone the VM into a template to install further nodes aft
 
 sudo apt-mark hold kubelet kubeadm kubectl
 
-•	Clone repository:
+Clone repository:
 
 
-mkdir ~/kubeinstall
+* mkdir ~/kubeinstall
 
-cd ~/kubeinstall
+* cd ~/kubeinstall
 
-git clone https://wwwin-github.cisco.com/EPFL/labmon_kubernetes.git .
-
-
-•	Edit kubeadm-config.yaml to reflect the routable IP address of the ubuntu VM on controlPlaneEndpoint
-
-sudo kubeadm init --config=kubeadm-config.yaml --upload-certs
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+* git clone https://wwwin-github.cisco.com/EPFL/labmon_kubernetes.git .
 
 
-•	Check kubernetes is up and running
-kubectl get nodes -o wide
+Edit kubeadm-config.yaml to reflect the routable IP address of the ubuntu VM on controlPlaneEndpoint
+
+* sudo kubeadm init --config=kubeadm-config.yaml --upload-certs
+* mkdir -p $HOME/.kube
+* sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+* sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+Check kubernetes is up and running
+
+* kubectl get nodes -o wide
 
 NAME               STATUS     ROLES    AGE    VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME
 kube-labmon-demo   NotReady   master   118s   v1.15.0   10.51.66.97   <none>        Ubuntu 18.04.2 LTS   4.15.0-45-generic   docker://18.9.7
@@ -93,22 +94,21 @@ Status NotReady is expected, since we still need to install network plugins
 
 Untaint master node
 
-
-kubectl taint nodes --all node-role.kubernetes.io/master-
+* kubectl taint nodes --all node-role.kubernetes.io/master-
 
 
 
 Install network plugins
 
-kubectl apply -f flannel.yaml
+* kubectl apply -f flannel.yaml
 
-kubectl apply -f multus.yaml
+* kubectl apply -f multus.yaml
 
-kubectl apply -f labmon-plugin.yaml
+* kubectl apply -f labmon-plugin.yaml
 
 
-sudo mkdir -p /root/.kube
-sudo cp ~/.kube/config /root/.kube
+* sudo mkdir -p /root/.kube
+* sudo cp ~/.kube/config /root/.kube
 
 
 At this point, node should change to 'Ready'
