@@ -91,7 +91,25 @@ class lmUnitTest(unittest.TestCase):
         K8 = labmon_cni.K8s_CNI()
         K8.entrypoint()
 
+    @mock.patch('labmon_cni.K8s_Params.get_k8s_params')
+    @mock.patch('labmon_cni.K8s_Params.get_annotations')
+    @mock.patch('labmon_cni.OSexec.exec', log_exec)
+    @mock.patch('labmon_cni.OSexec.exec_get_output', log_exec_with_rc)
+    def test_up_null_annotations(self,
+        labmon_cni_K8s_Params_get_annotations,
+        labmon_cni_K8s_Params_get_k8s_params):
+        NULL_IP_ANNOTATIONS = {
+            'cisco.epfl/interface_maps' : 
+                '[{"interface":"net1","vlan":519,"ip": null,"netmask": null},{"interface":"net2","vlan":529,"ip":"2.2.2.2","netmask":"16"}]'
+        }
 
-#logging.basicConfig(filename='/tmp/app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
+        k8s_params = MOCKED_K8S_PARAMS
+        k8s_params['CNI_COMMAND'] = 'ADD'
+        labmon_cni_K8s_Params_get_k8s_params.return_value = k8s_params
+        labmon_cni_K8s_Params_get_annotations.return_value = NULL_IP_ANNOTATIONS
+        K8 = labmon_cni.K8s_CNI()
+        K8.entrypoint()
+
+
+logging.basicConfig(format='%(asctime)s [%(process)d] - %(levelname)s - %(message)s', level=logging.DEBUG)
 unittest.main()
