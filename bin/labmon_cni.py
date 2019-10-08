@@ -253,7 +253,7 @@ class K8s_CNI:
 
 ### Entrypoint ###
 if __name__ == "__main__":
-    logging.basicConfig(filename='/tmp/app.log', filemode='a', format='%(asctime)s [%(process)d] - %(levelname)s - %(message)s', level=logging.DEBUG)
+    logging.basicConfig(filename='/var/log/labmon_cni.log', filemode='a', format='%(asctime)s [%(process)d] - %(levelname)s - %(message)s', level=logging.DEBUG)
     try:
         K8s_CNI().entrypoint()
     except Exception as e:
