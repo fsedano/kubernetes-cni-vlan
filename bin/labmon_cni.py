@@ -210,7 +210,7 @@ class K8s_CNI:
 
 
     def oper_perform(self,oper):
-        logging.info("In oper add")
+        logging.info(f"Performing operation {oper}")
         interface_maps = self.prepare_interface_maps()
         # Loop thru the interfaces
         index = 0
