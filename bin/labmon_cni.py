@@ -155,6 +155,7 @@ class CNIInterface:
         table_exists = OSexec.exec(f"iptables -C FORWARD -i {phy_name}  -j ACCEPT")
         if not table_exists:
             OSexec.exec(f"iptables -A FORWARD -i {phy_name}  -j ACCEPT")
+        OSexec.exec(f"ip netns add dummy1")
         OSexec.exec(f"ln -sfT {netns} /var/run/netns/{containerid}")
         OSexec.exec(f"ip link add {ifname} type veth peer name {host_if_name}")
         OSexec.exec(f"ip link set {host_if_name} up")
