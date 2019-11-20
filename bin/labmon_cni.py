@@ -8,6 +8,7 @@ from kubernetes import client, config
 import json
 import ipaddress
 import logging
+import random
 
 MASTER_INTERFACE_NAME = "ens192"
 class K8s_Params:
@@ -122,7 +123,7 @@ class OSexec:
                 pass
             logging.info(f"   Call failed, retrying, {retry} times left...")
             retry = retry - 1
-            time.sleep(0.1)
+            time.sleep(random.randint(100,1000)/1000)
     @classmethod
     def exec_get_output(self, cmd):
         rc = ""
