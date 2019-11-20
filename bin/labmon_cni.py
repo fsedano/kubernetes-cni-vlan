@@ -106,16 +106,23 @@ class K8s_Params:
 
 class OSexec:
     @classmethod
-    def exec(self, cmd):
-        try:
-            subprocess.check_output(cmd, shell=True).decode()
-            logging.info(f" SUCCESS -> {cmd}")
-            rc = True
-        except:
-            logging.info(f" FAILURE -> {cmd}")
-            rc = False
-            pass
-        return rc
+    def exec(self, cmd, retry=0):
+        while True:
+            try:
+                subprocess.check_output(cmd, shell=True).decode()
+                logging.info(f" SUCCESS -> {cmd}")
+                return True
+            except:
+                if retry > 0:
+                    logging.info(f" TEMP_FAILURE -> {cmd}")
+                else:
+                    logging.info(f" FAILURE -> {cmd}")
+                if  retry == 0:
+                    return False
+                pass
+            logging.info(f"   Call failed, retrying, {retry} times left...")
+            retry = retry - 1
+            time.sleep(0.1)
     @classmethod
     def exec_get_output(self, cmd):
         rc = ""
@@ -157,7 +164,7 @@ class CNIInterface:
             OSexec.exec(f"iptables -A FORWARD -i {phy_name}  -j ACCEPT")
         OSexec.exec(f"ip netns add dummy1")
         OSexec.exec(f"ln -sfT {netns} /var/run/netns/{containerid}")
-        OSexec.exec(f"ip link add {ifname} type veth peer name {host_if_name}")
+        OSexec.exec(f"ip link add {ifname} type veth peer name {host_if_name}", retry=100)
         OSexec.exec(f"ip link set {host_if_name} up")
         OSexec.exec(f"ip link set {host_if_name} master {phy_name}")
         OSexec.exec(f"ip link set {ifname} netns {containerid}")
