@@ -1,14 +1,18 @@
 #!/usr/bin/python3
-import sys
-import os
-import time
-import subprocess
-import random
-from kubernetes import client, config
-import json
-import ipaddress
-import logging
-import random
+try:
+    import sys
+    import os
+    import time
+    import subprocess
+    import random
+    from kubernetes import client, config
+    import json
+    import ipaddress
+    import logging
+    import random
+except Exception as e:
+    print('{"cniVersion":"0.3.1", "code":200, "msg":"Error on import", "details":"'+str(e)+'"}')
+    exit(200)
 
 MASTER_INTERFACE_NAME = "ens192"
 class K8s_Params:
